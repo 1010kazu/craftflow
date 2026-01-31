@@ -5,7 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { apiRequest, apiRequestFormData } from '@/lib/api/client';
-import { Item, ItemType } from '@/types';
+import { Item, ItemType, ItemWithRecipe } from '@/types';
 import {
   Container,
   Typography,
@@ -56,14 +56,16 @@ export default function AdminItemsPage() {
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [itemType, setItemType] = useState<ItemType>(ItemType.MATERIAL);
-  const [addRecipe, setAddRecipe] = useState(false);
+  const [hasRecipe, setHasRecipe] = useState(false);
   const [craftTime, setCraftTime] = useState(0);
   const [outputCount, setOutputCount] = useState(1);
   const [requiredFacilityId, setRequiredFacilityId] = useState<string>('');
   const [materials, setMaterials] = useState<MaterialRow[]>([defaultMaterialRow()]);
   const [mounted, setMounted] = useState(false);
+  const [loadingItemDetail, setLoadingItemDetail] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -102,10 +104,21 @@ export default function AdminItemsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (payload: { itemId: string; name: string; itemType: ItemType }) => {
-      return apiRequest<Item>(`/games/${gameId}/items/${payload.itemId}`, {
+    mutationFn: async (payload: {
+      itemId: string;
+      name: string;
+      itemType: ItemType;
+      recipe?: {
+        craftTime: number;
+        outputCount: number;
+        requiredFacilityId?: string | null;
+        materials: { materialItemId: string; quantity: number }[];
+      } | null;
+    }) => {
+      const { itemId, ...data } = payload;
+      return apiRequest<Item>(`/games/${gameId}/items/${itemId}`, {
         method: 'PUT',
-        body: JSON.stringify({ name: payload.name, itemType: payload.itemType }),
+        body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
@@ -140,27 +153,53 @@ export default function AdminItemsPage() {
     setName('');
     setItemType(ItemType.MATERIAL);
     setEditingItem(null);
-    setAddRecipe(false);
+    setEditingItemId(null);
+    setHasRecipe(false);
     setCraftTime(0);
     setOutputCount(1);
     setRequiredFacilityId('');
     setMaterials([defaultMaterialRow()]);
   };
 
-  const handleOpen = (item?: Item) => {
+  const handleOpen = async (item?: Item) => {
     if (item) {
       setEditingItem(item);
+      setEditingItemId(item.id);
       setName(item.name);
       setItemType(item.itemType);
-      setAddRecipe(false);
-      setCraftTime(0);
-      setOutputCount(1);
-      setRequiredFacilityId('');
-      setMaterials([defaultMaterialRow()]);
+      setOpen(true);
+
+      // アイテム詳細を取得してレシピ情報をロード
+      setLoadingItemDetail(true);
+      try {
+        const detail = await apiRequest<ItemWithRecipe>(`/games/${gameId}/items/${item.id}`);
+        if (detail.recipe) {
+          setHasRecipe(true);
+          setCraftTime(detail.recipe.craftTime);
+          setOutputCount(detail.recipe.outputCount);
+          setRequiredFacilityId(detail.recipe.requiredFacilityId || '');
+          setMaterials(
+            detail.recipe.materials.map((m) => ({
+              materialItemId: m.materialItemId,
+              quantity: m.quantity,
+            }))
+          );
+        } else {
+          setHasRecipe(false);
+          setCraftTime(0);
+          setOutputCount(1);
+          setRequiredFacilityId('');
+          setMaterials([defaultMaterialRow()]);
+        }
+      } catch (e) {
+        console.error('Failed to fetch item detail:', e);
+      } finally {
+        setLoadingItemDetail(false);
+      }
     } else {
       resetForm();
+      setOpen(true);
     }
-    setOpen(true);
   };
 
   const handleClose = () => {
@@ -190,39 +229,51 @@ export default function AdminItemsPage() {
   const buildRecipePayload = (): {
     craftTime: number;
     outputCount: number;
-    requiredFacilityId?: string;
+    requiredFacilityId?: string | null;
     materials: { materialItemId: string; quantity: number }[];
-  } | undefined => {
-    if (!addRecipe) return undefined;
+  } | null | undefined => {
+    if (!hasRecipe) {
+      // 編集時でレシピを削除する場合は null を返す
+      if (editingItem) {
+        return null;
+      }
+      return undefined;
+    }
     const validMaterials = materials.filter((m) => m.materialItemId && m.quantity >= 1);
     if (validMaterials.length === 0) return undefined;
     return {
       craftTime: Math.max(0, craftTime),
       outputCount: Math.max(1, outputCount),
-      requiredFacilityId: requiredFacilityId || undefined,
+      requiredFacilityId: requiredFacilityId || null,
       materials: validMaterials.map((m) => ({ materialItemId: m.materialItemId, quantity: m.quantity })),
     };
   };
 
   const handleSubmit = () => {
-    if (editingItem) {
-      updateMutation.mutate({ itemId: editingItem.id, name, itemType });
-      return;
-    }
     const recipe = buildRecipePayload();
-    createMutation.mutate({
-      name,
-      itemType,
-      recipe,
-    });
+    if (editingItem && editingItemId) {
+      updateMutation.mutate({
+        itemId: editingItemId,
+        name,
+        itemType,
+        recipe,
+      });
+    } else {
+      createMutation.mutate({
+        name,
+        itemType,
+        recipe: recipe === null ? undefined : recipe,
+      });
+    }
   };
 
-  const canSubmitRecipe = addRecipe && materials.some((m) => m.materialItemId && m.quantity >= 1);
+  const canSubmitRecipe = hasRecipe && materials.some((m) => m.materialItemId && m.quantity >= 1);
   const isSubmitDisabled =
     !name ||
     createMutation.isPending ||
     updateMutation.isPending ||
-    (!editingItem && addRecipe && (!canSubmitRecipe || materials.some((m) => m.quantity < 1)));
+    loadingItemDetail ||
+    (hasRecipe && (!canSubmitRecipe || materials.some((m) => m.quantity < 1)));
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -313,39 +364,43 @@ export default function AdminItemsPage() {
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>{editingItem ? 'アイテム編集' : 'アイテム追加'}</DialogTitle>
         <DialogContent>
-          <TextField
-            fullWidth
-            label="アイテム名"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            margin="normal"
-            required
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>アイテム種別</InputLabel>
-            <Select value={itemType} label="アイテム種別" onChange={(e) => setItemType(e.target.value as ItemType)}>
-              <MenuItem value={ItemType.FACILITY}>施設</MenuItem>
-              <MenuItem value={ItemType.MATERIAL}>素材</MenuItem>
-              <MenuItem value={ItemType.OTHER}>その他</MenuItem>
-            </Select>
-          </FormControl>
-
-          {!editingItem && (
+          {loadingItemDetail ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
             <>
+              <TextField
+                fullWidth
+                label="アイテム名"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                margin="normal"
+                required
+              />
+              <FormControl fullWidth margin="normal">
+                <InputLabel>アイテム種別</InputLabel>
+                <Select value={itemType} label="アイテム種別" onChange={(e) => setItemType(e.target.value as ItemType)}>
+                  <MenuItem value={ItemType.FACILITY}>施設</MenuItem>
+                  <MenuItem value={ItemType.MATERIAL}>素材</MenuItem>
+                  <MenuItem value={ItemType.OTHER}>その他</MenuItem>
+                </Select>
+              </FormControl>
+
               <Divider sx={{ my: 2 }} />
               <FormGroup>
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={addRecipe}
-                      onChange={(e) => setAddRecipe(e.target.checked)}
+                      checked={hasRecipe}
+                      onChange={(e) => setHasRecipe(e.target.checked)}
                     />
                   }
-                  label="レシピを追加する"
+                  label={editingItem ? 'レシピを設定する' : 'レシピを追加する'}
                 />
               </FormGroup>
 
-              {addRecipe && (
+              {hasRecipe && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     レシピ情報
@@ -390,59 +445,61 @@ export default function AdminItemsPage() {
                     </Typography>
                   ) : (
                     <>
-                  <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                    必要素材（1つ以上）
-                  </Typography>
-                  {materials.map((row, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        display: 'flex',
-                        gap: 1,
-                        alignItems: 'center',
-                        mb: 1,
-                      }}
-                    >
-                      <FormControl sx={{ flex: 2, minWidth: 0 }}>
-                        <InputLabel>素材</InputLabel>
-                        <Select
-                          value={row.materialItemId}
-                          label="素材"
-                          onChange={(e) => updateMaterialRow(index, 'materialItemId', e.target.value)}
+                      <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                        必要素材（1つ以上）
+                      </Typography>
+                      {materials.map((row, index) => (
+                        <Box
+                          key={index}
+                          sx={{
+                            display: 'flex',
+                            gap: 1,
+                            alignItems: 'center',
+                            mb: 1,
+                          }}
                         >
-                          {items.map((item) => (
-                            <MenuItem key={item.id} value={item.id}>
-                              {item.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      <TextField
-                        type="number"
-                        label="数量"
-                        value={row.quantity}
-                        onChange={(e) => updateMaterialRow(index, 'quantity', e.target.value)}
-                        sx={{ width: 100 }}
-                        inputProps={{ min: 1 }}
-                      />
-                      <IconButton
+                          <FormControl sx={{ flex: 2, minWidth: 0 }}>
+                            <InputLabel>素材</InputLabel>
+                            <Select
+                              value={row.materialItemId}
+                              label="素材"
+                              onChange={(e) => updateMaterialRow(index, 'materialItemId', e.target.value)}
+                            >
+                              {items
+                                .filter((i) => i.id !== editingItemId)
+                                .map((item) => (
+                                  <MenuItem key={item.id} value={item.id}>
+                                    {item.name}
+                                  </MenuItem>
+                                ))}
+                            </Select>
+                          </FormControl>
+                          <TextField
+                            type="number"
+                            label="数量"
+                            value={row.quantity}
+                            onChange={(e) => updateMaterialRow(index, 'quantity', e.target.value)}
+                            sx={{ width: 100 }}
+                            inputProps={{ min: 1 }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={() => removeMaterialRow(index)}
+                            disabled={materials.length <= 1}
+                            aria-label="素材を削除"
+                          >
+                            <RemoveCircleOutlineIcon />
+                          </IconButton>
+                        </Box>
+                      ))}
+                      <Button
                         size="small"
-                        onClick={() => removeMaterialRow(index)}
-                        disabled={materials.length <= 1}
-                        aria-label="素材を削除"
+                        startIcon={<AddIcon />}
+                        onClick={addMaterialRow}
+                        sx={{ mt: 1 }}
                       >
-                        <RemoveCircleOutlineIcon />
-                      </IconButton>
-                    </Box>
-                  ))}
-                  <Button
-                    size="small"
-                    startIcon={<AddIcon />}
-                    onClick={addMaterialRow}
-                    sx={{ mt: 1 }}
-                  >
-                    素材を追加
-                  </Button>
+                        素材を追加
+                      </Button>
                     </>
                   )}
                 </Box>
