@@ -22,10 +22,11 @@
 
 ## 🏗️ 設計ドキュメント
 
-- [設計書](./DESIGN.md) - 全体設計
-- [データベーススキーマ](./SCHEMA.md) - データベース設計
-- [API仕様書](./API_SPEC.md) - APIエンドポイント仕様
-- [UI/UX設計書](./UI_DESIGN.md) - 画面設計
+- [設計書](./docs/DESIGN.md) - 全体設計・システムアーキテクチャ
+- [データベーススキーマ](./docs/SCHEMA.md) - データベース設計・型定義
+- [API仕様書](./docs/API_SPEC.md) - APIエンドポイント仕様
+- [UI/UX設計書](./docs/UI_DESIGN.md) - 画面設計・コンポーネント
+- [アルゴリズム](./docs/ALGORITHM.md) - レシピツリーアルゴリズム
 
 ## 🚀 技術スタック
 
@@ -89,27 +90,31 @@ npm run dev
 ```
 craftflow/
 ├── app/                    # Next.js App Router
-│   ├── (auth)/            # 認証ページ
-│   ├── (user)/             # 利用者ページ
+│   ├── (auth)/             # 認証ページ（login, register）
+│   ├── (user)/             # 利用者ページ（games, items）
 │   ├── admin/              # 管理者ページ
 │   └── api/                # API Routes
 ├── components/             # Reactコンポーネント
-│   ├── common/             # 共通コンポーネント
-│   ├── items/              # アイテム関連
-│   ├── recipes/            # レシピ関連
-│   └── admin/              # 管理者用
+│   ├── common/             # 共通コンポーネント（Header）
+│   └── recipes/            # レシピ関連（RecipeTree）
 ├── lib/                    # ユーティリティ
+│   ├── api/                # APIクライアント
 │   ├── db/                 # Prisma設定
-│   ├── auth/               # 認証関連
+│   ├── auth/               # 認証関連（jwt, password）
 │   └── utils/              # ヘルパー関数
 ├── types/                  # TypeScript型定義
 ├── hooks/                  # カスタムフック
 ├── store/                  # Zustandストア
 ├── prisma/                 # Prismaスキーマ
-├── DESIGN.md               # 設計書
-├── SCHEMA.md               # データベーススキーマ
-├── API_SPEC.md             # API仕様書
-└── UI_DESIGN.md            # UI/UX設計書
+├── docs/                   # 設計ドキュメント
+│   ├── DESIGN.md           # 全体設計
+│   ├── SCHEMA.md           # データベーススキーマ
+│   ├── API_SPEC.md         # API仕様書
+│   ├── UI_DESIGN.md        # UI/UX設計書
+│   └── ALGORITHM.md        # アルゴリズム
+├── docker-compose.yml      # Docker Compose設定
+├── Dockerfile              # 本番用Dockerfile
+└── Dockerfile.dev          # 開発用Dockerfile
 ```
 
 ## 🔐 認証・認可
@@ -144,7 +149,7 @@ craftflow/
 - **Recipe**: レシピ（作成時間、必要施設、作成個数）
 - **RecipeMaterial**: レシピに必要な素材と数量
 
-詳細は [docs/SCHEMA.md](./docs/SCHEMA.md) を参照してください。
+詳細は [SCHEMA.md](./docs/SCHEMA.md) を参照してください。
 
 ## 🔄 レシピツリー機能
 
