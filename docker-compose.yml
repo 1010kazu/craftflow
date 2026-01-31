@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: craftflow-postgres
+    environment:
+      POSTGRES_USER: craftflow_user
+      POSTGRES_PASSWORD: craftflow_password
+      POSTGRES_DB: craftflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U craftflow_user -d craftflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: craftflow-app
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://craftflow_user:craftflow_password@postgres:5432/craftflow?schema=public
+      JWT_SECRET: dev-secret-key-change-in-production-please
+      NEXT_PUBLIC_API_BASE_URL: /api
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma db push && npm run dev"
+
+volumes:
+  postgres_data:

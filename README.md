@@ -63,13 +63,26 @@ npm install
 # 環境変数の設定
 cp .env.example .env
 # .envファイルを編集してデータベース接続情報等を設定
+# DATABASE_URL="postgresql://user:password@localhost:5432/craftflow?schema=public"
+# JWT_SECRET="your-secret-key-change-in-production"
+
+# Prismaクライアントの生成
+npm run db:generate
 
 # データベースのマイグレーション
-npx prisma migrate dev
+npm run db:migrate
+# または、開発環境では以下でも可
+npm run db:push
 
 # 開発サーバーの起動
 npm run dev
 ```
+
+### 初回セットアップ後の注意事項
+
+1. データベースが作成されていない場合は、PostgreSQLでデータベースを作成してください
+2. `.env`ファイルに`DATABASE_URL`と`JWT_SECRET`を設定してください
+3. 管理者ユーザーを作成するには、データベースで直接`role`を`ADMIN`に変更するか、シードスクリプトを使用してください
 
 ## 📁 プロジェクト構成
 
@@ -102,9 +115,25 @@ craftflow/
 ## 🔐 認証・認可
 
 - ユーザーはメールアドレスとパスワードで登録・ログイン
-- ロール: `ADMIN`（管理者）、`USER`（利用者）
 - JWTトークンによる認証
-- 管理者のみゲーム・アイテム・レシピの追加・編集・削除が可能
+
+### ユーザー権限
+
+| 権限 | 説明 | できること |
+|------|------|------------|
+| **ADMIN**（管理者） | システム全体を管理する権限 | ゲームタイトルの追加・編集・削除、アイテム・レシピの追加・編集・削除、CSV/JSONインポート、全利用者機能 |
+| **USER**（利用者） | 一般的な閲覧権限 | ゲーム選択、アイテム一覧の表示・検索・ソート、アイテム詳細の表示、レシピツリーの表示、必要素材数の確認 |
+
+### サンプルアカウント
+
+開発・テスト用のサンプルアカウントが用意されています。
+
+| 権限 | メールアドレス | パスワード |
+|------|----------------|------------|
+| ADMIN（管理者） | admin@example.com | password123 |
+| USER（利用者） | user@example.com | password123 |
+
+> ⚠️ **注意**: 本番環境では必ずサンプルアカウントを削除し、セキュアなパスワードを使用してください。
 
 ## 📊 データモデル
 
@@ -115,7 +144,7 @@ craftflow/
 - **Recipe**: レシピ（作成時間、必要施設、作成個数）
 - **RecipeMaterial**: レシピに必要な素材と数量
 
-詳細は [SCHEMA.md](./SCHEMA.md) を参照してください。
+詳細は [docs/SCHEMA.md](./docs/SCHEMA.md) を参照してください。
 
 ## 🔄 レシピツリー機能
 

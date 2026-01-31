@@ -1,0 +1,93 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum ItemType {
+  FACILITY    // 施設
+  MATERIAL    // 素材
+  OTHER       // その他
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Game {
+  id          String   @id @default(uuid())
+  name      String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       Item[]
+
+  @@map("games")
+}
+
+model Item {
+  id          String   @id @default(uuid())
+  gameId      String
+  name        String
+  itemType    ItemType
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  game            Game    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  recipe          Recipe?
+  requiredFacilities Recipe[] @relation("RequiredFacility")
+  materialRecipes RecipeMaterial[]
+
+  @@unique([gameId, name])
+  @@index([gameId, name])
+  @@map("items")
+}
+
+model Recipe {
+  id                String   @id @default(uuid())
+  itemId            String   @unique
+  craftTime         Int      // 秒
+  outputCount       Int      // 作成される個数
+  requiredFacilityId String? // 必要な施設（Item.itemType = FACILITY）
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  item              Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  requiredFacility  Item?    @relation("RequiredFacility", fields: [requiredFacilityId], references: [id])
+  materials         RecipeMaterial[]
+
+  @@index([itemId])
+  @@map("recipes")
+}
+
+model RecipeMaterial {
+  id             String   @id @default(uuid())
+  recipeId       String
+  materialItemId String
+  quantity       Int      // 必要な個数
+  createdAt      DateTime @default(now())
+
+  recipe         Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  materialItem   Item     @relation(fields: [materialItemId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, materialItemId])
+  @@index([recipeId])
+  @@map("recipe_materials")
+}
