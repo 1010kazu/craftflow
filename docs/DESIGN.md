@@ -2,147 +2,199 @@
 
 ## 1. 概要
 
-工業系ゲームのレシピを管理し、再帰的にレシピツリーを表示するWebアプリケーション。
+工業系ゲーム（Factorio、Satisfactory等）のレシピを管理し、再帰的にレシピツリーを表示するWebアプリケーション。
 
 ## 2. 技術スタック
 
 ### フロントエンド
-- **フレームワーク**: React (TypeScript)
-- **UIライブラリ**: Material-UI (MUI) または Tailwind CSS
-- **状態管理**: React Query + Zustand
-- **ルーティング**: React Router
-- **フォーム管理**: React Hook Form
-- **CSV/JSONパーサー**: papaparse (CSV), 標準JSON
+| 技術 | バージョン | 用途 |
+|------|-----------|------|
+| Next.js | 16.x | フルスタックフレームワーク |
+| React | 19.x | UIライブラリ |
+| TypeScript | 5.x | 型安全な開発 |
+| Material-UI (MUI) | 7.x | UIコンポーネント |
+| Tailwind CSS | 4.x | ユーティリティCSS |
+| React Query | 5.x | データフェッチング・キャッシュ |
+| Zustand | 5.x | 状態管理 |
 
 ### バックエンド
-- **フレームワーク**: Node.js + Express または Next.js (Full-stack)
-- **データベース**: PostgreSQL
-- **ORM**: Prisma
-- **認証**: JWT + bcrypt
-- **バリデーション**: Zod
+| 技術 | バージョン | 用途 |
+|------|-----------|------|
+| Next.js API Routes | 16.x | APIエンドポイント |
+| PostgreSQL | 16.x | データベース |
+| Prisma | 6.x | ORM |
+| JWT (jsonwebtoken) | - | 認証トークン |
+| bcryptjs | - | パスワードハッシュ |
+| Zod | - | バリデーション |
 
 ### インフラ
-- **コンテナ**: Docker
-- **デプロイ**: Vercel / Railway / AWS
+| 技術 | 用途 |
+|------|------|
+| Docker | コンテナ化 |
+| Docker Compose | 開発環境オーケストレーション |
 
-## 3. データベース設計
-
-### 3.1 ER図
-
-```
-User (ユーザー)
-├── id: UUID (PK)
-├── email: String (Unique)
-├── password: String (Hashed)
-├── role: Enum (ADMIN, USER)
-└── createdAt: DateTime
-
-Game (ゲームタイトル)
-├── id: UUID (PK)
-├── name: String
-├── description: String (Optional)
-└── createdAt: DateTime
-
-Item (アイテム)
-├── id: UUID (PK)
-├── gameId: UUID (FK -> Game.id)
-├── name: String
-├── itemType: Enum (FACILITY, MATERIAL, OTHER)
-└── createdAt: DateTime
-
-Recipe (レシピ)
-├── id: UUID (PK)
-├── itemId: UUID (FK -> Item.id, Unique)
-├── craftTime: Integer (秒)
-├── outputCount: Integer (作成される個数)
-├── requiredFacilityId: UUID (FK -> Item.id, Nullable)
-└── createdAt: DateTime
-
-RecipeMaterial (レシピ素材)
-├── id: UUID (PK)
-├── recipeId: UUID (FK -> Recipe.id)
-├── materialItemId: UUID (FK -> Item.id)
-├── quantity: Integer (必要な個数)
-└── createdAt: DateTime
-```
-
-### 3.2 データモデル詳細
-
-#### User
-- 認証情報と権限を管理
-- role: ADMIN | USER
-
-#### Game
-- 工業系ゲームタイトルを管理
-- 管理者のみ追加可能
-
-#### Item
-- アイテムの基本情報
-- itemType: FACILITY（施設）| MATERIAL（素材）| OTHER（その他）
-- 同じゲーム内で名前は一意
-
-#### Recipe
-- アイテムの作成レシピ
-- requiredFacilityId: 必要な施設（Item.itemType = FACILITY のもの）
-- 1アイテム = 1レシピ（1対1）
-
-#### RecipeMaterial
-- レシピに必要な素材と数量
-- 1レシピ = 複数素材（1対多）
-
-## 4. API設計
-
-### 4.1 認証API
+## 3. システムアーキテクチャ
 
 ```
-POST /api/auth/register
-POST /api/auth/login
-POST /api/auth/logout
-GET  /api/auth/me
+┌─────────────────────────────────────────────────────────────┐
+│                      クライアント                            │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Next.js (React)                         │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │   │
+│  │  │ Zustand  │ │  React   │ │   MUI    │            │   │
+│  │  │  Store   │ │  Query   │ │Components│            │   │
+│  │  └──────────┘ └──────────┘ └──────────┘            │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTP/REST
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      サーバー                                │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │           Next.js API Routes                         │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │   │
+│  │  │   JWT    │ │   Zod    │ │  Prisma  │            │   │
+│  │  │   Auth   │ │Validation│ │  Client  │            │   │
+│  │  └──────────┘ └──────────┘ └──────────┘            │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ SQL
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    PostgreSQL                                │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │  users   │ │  games   │ │  items   │ │ recipes  │       │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 ゲーム管理API（管理者のみ）
+## 4. データベース設計
+
+### 4.1 ER図
 
 ```
-GET    /api/games              # ゲーム一覧取得
-POST   /api/games              # ゲーム追加
-GET    /api/games/:id          # ゲーム詳細取得
-PUT    /api/games/:id          # ゲーム更新
-DELETE /api/games/:id          # ゲーム削除
+┌──────────────┐
+│    User      │
+├──────────────┤
+│ id (PK)      │
+│ email        │
+│ password     │
+│ role         │
+│ createdAt    │
+│ updatedAt    │
+└──────────────┘
+
+┌──────────────┐       ┌──────────────┐
+│    Game      │       │    Item      │
+├──────────────┤       ├──────────────┤
+│ id (PK)      │──────<│ id (PK)      │
+│ name         │       │ gameId (FK)  │
+│ description  │       │ name         │
+│ createdAt    │       │ itemType     │
+│ updatedAt    │       │ createdAt    │
+└──────────────┘       │ updatedAt    │
+                       └──────────────┘
+                              │
+                              │ 1:1
+                              ▼
+                       ┌──────────────┐
+                       │   Recipe     │
+                       ├──────────────┤
+                       │ id (PK)      │
+                       │ itemId (FK)  │
+                       │ craftTime    │
+                       │ outputCount  │
+                       │ requiredFacilityId│
+                       │ createdAt    │
+                       │ updatedAt    │
+                       └──────────────┘
+                              │
+                              │ 1:N
+                              ▼
+                       ┌──────────────┐
+                       │RecipeMaterial│
+                       ├──────────────┤
+                       │ id (PK)      │
+                       │ recipeId (FK)│
+                       │ materialItemId│
+                       │ quantity     │
+                       │ createdAt    │
+                       └──────────────┘
 ```
 
-### 4.3 アイテム管理API
+### 4.2 テーブル詳細
+
+詳細は [SCHEMA.md](./SCHEMA.md) を参照してください。
+
+## 5. 認証・認可設計
+
+### 5.1 認証フロー
 
 ```
-GET    /api/games/:gameId/items           # アイテム一覧取得（検索・ソート対応）
-GET    /api/games/:gameId/items/:itemId   # アイテム詳細取得
-POST   /api/games/:gameId/items           # アイテム追加（管理者のみ）
-PUT    /api/games/:gameId/items/:itemId   # アイテム更新（管理者のみ）
-DELETE /api/games/:gameId/items/:itemId   # アイテム削除（管理者のみ）
+1. ユーザー登録 (POST /api/auth/register)
+   └─> パスワードをbcryptでハッシュ化
+   └─> JWTトークンを生成して返却
+
+2. ログイン (POST /api/auth/login)
+   └─> パスワードを検証
+   └─> JWTトークンを生成して返却
+
+3. 認証済みリクエスト
+   └─> Authorizationヘッダーからトークンを取得
+   └─> JWTを検証
+   └─> ユーザー情報をリクエストに付加
 ```
 
-### 4.4 レシピ管理API（管理者のみ）
+### 5.2 権限モデル
+
+| 権限 | 説明 | 許可される操作 |
+|------|------|----------------|
+| ADMIN | 管理者 | ゲーム・アイテム・レシピのCRUD、インポート、全閲覧機能 |
+| USER | 利用者 | ゲーム・アイテム・レシピの閲覧、検索、レシピツリー表示 |
+
+### 5.3 サンプルアカウント
+
+| 権限 | メールアドレス | パスワード |
+|------|----------------|------------|
+| ADMIN | admin@example.com | password123 |
+| USER | user@example.com | password123 |
+
+## 6. API設計
+
+詳細は [API_SPEC.md](./API_SPEC.md) を参照してください。
+
+### 6.1 エンドポイント一覧
+
+| メソッド | パス | 説明 | 認証 |
+|---------|------|------|------|
+| POST | /api/auth/register | ユーザー登録 | 不要 |
+| POST | /api/auth/login | ログイン | 不要 |
+| GET | /api/auth/me | 現在のユーザー取得 | 必要 |
+| GET | /api/games | ゲーム一覧取得 | 不要 |
+| POST | /api/games | ゲーム作成 | ADMIN |
+| GET | /api/games/:gameId | ゲーム詳細取得 | 不要 |
+| PUT | /api/games/:gameId | ゲーム更新 | ADMIN |
+| DELETE | /api/games/:gameId | ゲーム削除 | ADMIN |
+| GET | /api/games/:gameId/items | アイテム一覧取得 | 不要 |
+| POST | /api/games/:gameId/items | アイテム作成 | ADMIN |
+| GET | /api/games/:gameId/items/:itemId | アイテム詳細取得 | 不要 |
+| PUT | /api/games/:gameId/items/:itemId | アイテム更新 | ADMIN |
+| DELETE | /api/games/:gameId/items/:itemId | アイテム削除 | ADMIN |
+| POST | /api/recipes | レシピ作成 | ADMIN |
+| GET | /api/recipes/:recipeId | レシピ詳細取得 | 不要 |
+| PUT | /api/recipes/:recipeId | レシピ更新 | ADMIN |
+| DELETE | /api/recipes/:recipeId | レシピ削除 | ADMIN |
+| GET | /api/recipes/:recipeId/tree | レシピツリー取得 | 不要 |
+| POST | /api/recipes/import | CSV/JSONインポート | ADMIN |
+
+## 7. フロントエンド設計
+
+### 7.1 ページ構成
 
 ```
-GET    /api/recipes/:recipeId              # レシピ詳細取得
-POST   /api/recipes                         # レシピ追加
-PUT    /api/recipes/:recipeId               # レシピ更新
-DELETE /api/recipes/:recipeId               # レシピ削除
-POST   /api/recipes/import                  # CSV/JSONインポート
-```
-
-### 4.5 レシピツリーAPI
-
-```
-GET /api/recipes/:recipeId/tree             # 再帰的レシピツリー取得
-```
-
-## 5. フロントエンド設計
-
-### 5.1 ページ構成
-
-```
-/                          # ログイン/ホーム
+/                          # ホーム（リダイレクト）
 /login                     # ログインページ
 /register                  # 登録ページ
 /games                     # ゲーム選択ページ
@@ -152,177 +204,190 @@ GET /api/recipes/:recipeId/tree             # 再帰的レシピツリー取得
 /admin/games/:gameId/items # アイテム管理（管理者）
 ```
 
-### 5.2 コンポーネント設計
+### 7.2 コンポーネント構成
 
-#### 共通コンポーネント
-- `Layout`: 共通レイアウト（ヘッダー、サイドバー）
-- `ProtectedRoute`: 認証保護ルート
-- `AdminRoute`: 管理者専用ルート
-- `SearchBar`: 検索バー
-- `SortButton`: ソートボタン
+```
+components/
+├── common/
+│   └── Header.tsx         # 共通ヘッダー（ログアウト機能含む）
+└── recipes/
+    └── RecipeTree.tsx     # レシピツリー表示
+```
 
-#### アイテム一覧ページ
-- `ItemList`: アイテム一覧表示
-- `ItemCard`: アイテムカード
-- `ItemFilters`: フィルター（検索、ソート）
+### 7.3 状態管理
 
-#### アイテム詳細ページ
-- `ItemDetail`: アイテム詳細表示
-- `RecipeDisplay`: レシピ表示
-- `RecipeTree`: 再帰的レシピツリー
-- `RecipeTreeNode`: ツリーノード（展開/折りたたみ）
-- `MaterialSummary`: 必要数合計表示
+#### Zustand Store
 
-#### 管理者ページ
-- `GameForm`: ゲーム追加/編集フォーム
-- `ItemForm`: アイテム追加/編集フォーム
-- `RecipeForm`: レシピ追加/編集フォーム
-- `ImportDialog`: CSV/JSONインポートダイアログ
-
-### 5.3 状態管理
-
-#### Zustandストア
-- `authStore`: 認証状態
-- `gameStore`: ゲーム選択状態
-- `uiStore`: UI状態（モーダル、ローディング等）
+| ストア | 用途 |
+|--------|------|
+| auth-store | 認証状態（ユーザー、トークン、ハイドレーション状態） |
+| game-store | ゲーム選択状態 |
 
 #### React Query
-- データフェッチングとキャッシュ管理
-- アイテム一覧、詳細、レシピツリー等
 
-## 6. 機能詳細設計
+- ゲーム一覧・詳細の取得とキャッシュ
+- アイテム一覧・詳細の取得とキャッシュ
+- レシピツリーの取得とキャッシュ
 
-### 6.1 レシピツリー表示
+## 8. UI/UX設計
 
-#### データ構造
-```typescript
-interface RecipeTreeNode {
-  item: Item;
-  recipe: Recipe;
-  materials: RecipeMaterial[];
-  children: RecipeTreeNode[]; // 再帰的
-  isExpanded: boolean;
-  requiredQuantity: number; // 親から必要な数量
-}
+詳細は [UI_DESIGN.md](./UI_DESIGN.md) を参照してください。
+
+### 8.1 画面一覧
+
+| 画面 | 説明 |
+|------|------|
+| ログイン | メール・パスワードでログイン |
+| 登録 | 新規ユーザー登録 |
+| ゲーム選択 | ゲームタイトル一覧をカード表示 |
+| アイテム一覧 | 検索・ソート・ページネーション付きリスト |
+| アイテム詳細 | レシピ情報とレシピツリー |
+| ゲーム管理 | ゲームのCRUD（管理者） |
+| アイテム管理 | アイテムのCRUD・インポート（管理者） |
+
+### 8.2 ヘッダー機能
+
+- CraftFlowロゴ（ホームへのリンク）
+- 管理者バッジ（ADMIN権限時）
+- ユーザーメニュー
+  - メールアドレス表示
+  - 管理者ページリンク（ADMIN権限時）
+  - ログアウト
+
+## 9. レシピツリーアルゴリズム
+
+詳細は [ALGORITHM.md](./ALGORITHM.md) を参照してください。
+
+### 9.1 基本機能
+
+1. **再帰的表示**: アイテムのレシピを最下層まで展開
+2. **展開/折りたたみ**: 各ノードを個別に制御可能
+3. **非表示機能**: ノード以下を非表示にできる
+4. **必要数計算**: 親の必要数から子の必要数を自動計算
+5. **合計表示**: 全アイテムの必要数合計を表示
+
+### 9.2 計算式
+
+```
+子の必要数 = ceil((親の必要数 × レシピの素材数) / レシピの作成個数)
 ```
 
-#### アルゴリズム
-1. ルートアイテムのレシピを取得
-2. 各素材アイテムについて再帰的にレシピを取得
-3. 素材がレシピを持たない（最下層）まで展開
-4. 各ノードで展開/折りたたみ状態を管理
-
-#### 必要数計算
-- 各アイテムの必要数を再帰的に計算
-- 親の必要数 × レシピの必要数 = 子の必要数
-- 同じアイテムが複数箇所で使用される場合は合算
-
-### 6.2 CSV/JSONインポート
-
-#### CSV形式
-```csv
-アイテム名,時間(秒),施設,アイテム種別,作成個数,素材1,個数1,素材2,個数2,...
-鉄板,60,製錬所,素材,1,鉄鉱石,2
-```
-
-#### JSON形式
-```json
-{
-  "items": [
-    {
-      "name": "鉄板",
-      "craftTime": 60,
-      "requiredFacility": "製錬所",
-      "itemType": "MATERIAL",
-      "outputCount": 1,
-      "materials": [
-        { "name": "鉄鉱石", "quantity": 2 }
-      ]
-    }
-  ]
-}
-```
-
-### 6.3 バリデーション
-
-#### レシピ追加時のバリデーション
-- アイテム名: 必須、同一ゲーム内で一意
-- 時間: 必須、0以上の整数
-- 施設: アイテム種別がFACILITYのアイテムのみ選択可能
-- アイテム種別: 必須、FACILITY | MATERIAL | OTHER
-- 作成個数: 必須、1以上の整数
-- 素材: 少なくとも1つ必要、すべてのアイテムから選択可能
-- 素材個数: 1以上の整数
-
-## 7. セキュリティ設計
-
-### 7.1 認証・認可
-- JWTトークンによる認証
-- ロールベースアクセス制御（RBAC）
-- パスワードはbcryptでハッシュ化
-
-### 7.2 入力検証
-- サーバーサイドでのバリデーション必須
-- SQLインジェクション対策（Prisma使用）
-- XSS対策（Reactの自動エスケープ）
-
-### 7.3 レート制限
-- API呼び出しのレート制限
-- インポート機能の制限
-
-## 8. パフォーマンス最適化
-
-### 8.1 データベース
-- インデックス: Item(gameId, name), Recipe(itemId)
-- クエリ最適化: 必要最小限のJOIN
-
-### 8.2 フロントエンド
-- レシピツリーの仮想スクロール（大量データ対応）
-- メモ化による再レンダリング最適化
-- ページネーション（アイテム一覧）
-
-## 9. 開発計画
-
-### Phase 1: 基盤構築
-- プロジェクトセットアップ
-- データベース設計・実装
-- 認証機能実装
-
-### Phase 2: 管理者機能
-- ゲーム管理
-- アイテム・レシピ管理
-- CSV/JSONインポート
-
-### Phase 3: 利用者機能
-- アイテム一覧・検索
-- アイテム詳細
-- レシピツリー表示
-
-### Phase 4: 最適化・テスト
-- パフォーマンス最適化
-- テスト実装
-- UI/UX改善
-
-## 10. ファイル構成（Next.js想定）
+## 10. ファイル構成
 
 ```
 craftflow/
-├── app/                    # Next.js App Router
-│   ├── (auth)/            # 認証ページ
-│   ├── (user)/             # 利用者ページ
-│   ├── admin/              # 管理者ページ
-│   └── api/                # API Routes
-├── components/             # Reactコンポーネント
-│   ├── common/             # 共通コンポーネント
-│   ├── items/              # アイテム関連
-│   ├── recipes/            # レシピ関連
-│   └── admin/              # 管理者用
-├── lib/                    # ユーティリティ
-│   ├── db/                 # Prisma設定
-│   ├── auth/               # 認証関連
-│   └── utils/              # ヘルパー関数
-├── types/                  # TypeScript型定義
-├── hooks/                  # カスタムフック
-├── store/                  # Zustandストア
-└── prisma/                 # Prismaスキーマ
+├── app/                        # Next.js App Router
+│   ├── (auth)/                 # 認証ページ（グループ）
+│   │   ├── login/page.tsx
+│   │   └── register/page.tsx
+│   ├── (user)/                 # 利用者ページ（グループ）
+│   │   └── games/
+│   │       ├── page.tsx
+│   │       └── [gameId]/items/
+│   │           ├── page.tsx
+│   │           └── [itemId]/page.tsx
+│   ├── admin/                  # 管理者ページ
+│   │   └── games/
+│   │       ├── page.tsx
+│   │       └── [gameId]/items/page.tsx
+│   ├── api/                    # API Routes
+│   │   ├── auth/
+│   │   ├── games/
+│   │   └── recipes/
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── providers.tsx
+├── components/                 # Reactコンポーネント
+│   ├── common/Header.tsx
+│   └── recipes/RecipeTree.tsx
+├── lib/                        # ユーティリティ
+│   ├── api/client.ts           # APIクライアント
+│   ├── auth/
+│   │   ├── jwt.ts              # JWT処理
+│   │   └── password.ts         # パスワード処理
+│   ├── db/prisma.ts            # Prismaクライアント
+│   └── utils/
+│       ├── api.ts              # APIヘルパー
+│       ├── auth-middleware.ts  # 認証ミドルウェア
+│       └── recipe-tree.ts      # レシピツリーロジック
+├── types/index.ts              # TypeScript型定義
+├── hooks/useHydration.ts       # カスタムフック
+├── store/                      # Zustandストア
+│   ├── auth-store.ts
+│   └── game-store.ts
+├── prisma/schema.prisma        # Prismaスキーマ
+├── docs/                       # 設計ドキュメント
+│   ├── DESIGN.md
+│   ├── SCHEMA.md
+│   ├── API_SPEC.md
+│   ├── UI_DESIGN.md
+│   └── ALGORITHM.md
+├── docker-compose.yml          # Docker Compose設定
+├── Dockerfile                  # 本番用Dockerfile
+├── Dockerfile.dev              # 開発用Dockerfile
+└── package.json
 ```
+
+## 11. 開発環境
+
+### 11.1 Docker Compose構成
+
+```yaml
+services:
+  postgres:     # PostgreSQLデータベース
+  app:          # Next.jsアプリケーション
+```
+
+### 11.2 起動方法
+
+```bash
+# コンテナ起動
+docker compose up -d
+
+# ログ確認
+docker compose logs -f app
+
+# 停止
+docker compose down
+```
+
+### 11.3 環境変数
+
+| 変数 | 説明 |
+|------|------|
+| DATABASE_URL | PostgreSQL接続文字列 |
+| JWT_SECRET | JWTシークレットキー |
+| NEXT_PUBLIC_API_BASE_URL | APIベースURL |
+
+## 12. セキュリティ
+
+### 12.1 認証
+
+- JWTトークンによる認証
+- パスワードはbcryptでハッシュ化（ソルトラウンド: 10）
+- トークンの有効期限: 7日
+
+### 12.2 認可
+
+- ロールベースアクセス制御（RBAC）
+- 管理者専用エンドポイントのミドルウェア保護
+
+### 12.3 入力検証
+
+- Zodによるサーバーサイドバリデーション
+- Prismaによるクエリパラメータ化（SQLインジェクション対策）
+- ReactによるXSS自動エスケープ
+
+## 13. パフォーマンス
+
+### 13.1 データベース
+
+- インデックス: `items(gameId, name)`, `recipes(itemId)`
+- カスケード削除による整合性維持
+
+### 13.2 フロントエンド
+
+- React Queryによるキャッシュ（staleTime: 60秒）
+- ページネーション（デフォルト: 20件/ページ）
+- SSRハイドレーション対応
