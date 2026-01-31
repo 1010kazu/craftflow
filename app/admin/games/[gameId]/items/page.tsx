@@ -30,12 +30,14 @@ import {
   Checkbox,
   IconButton,
   Divider,
+  Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { useState, useEffect } from 'react';
 
 interface MaterialRow {
@@ -327,7 +329,14 @@ export default function AdminItemsPage() {
             <Card>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <Typography variant="h6">{item.name}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="h6">{item.name}</Typography>
+                    {item.hasRecipe && (
+                      <Tooltip title="レシピあり">
+                        <MenuBookIcon fontSize="small" color="primary" />
+                      </Tooltip>
+                    )}
+                  </Box>
                   <Chip
                     label={item.itemType}
                     size="small"

@@ -62,13 +62,25 @@ export async function GET(
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
+        include: {
+          recipe: {
+            select: { id: true },
+          },
+        },
       }),
       prisma.item.count({ where }),
     ]);
 
+    // レシピ有無フラグを追加
+    const itemsWithRecipeFlag = items.map((item) => ({
+      ...item,
+      hasRecipe: !!item.recipe,
+      recipe: undefined, // レシピ詳細は返さない
+    }));
+
     return NextResponse.json(
       createSuccessResponse({
-        items,
+        items: itemsWithRecipeFlag,
         pagination: {
           page,
           limit,

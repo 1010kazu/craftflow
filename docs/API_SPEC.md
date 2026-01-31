@@ -282,6 +282,15 @@ Authorization: Bearer {token}
       "gameId": "uuid",
       "name": "鉄板",
       "itemType": "MATERIAL",
+      "hasRecipe": true,
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "uuid",
+      "gameId": "uuid",
+      "name": "鉄鉱石",
+      "itemType": "MATERIAL",
+      "hasRecipe": false,
       "createdAt": "2024-01-01T00:00:00Z"
     }
   ],
@@ -293,6 +302,16 @@ Authorization: Bearer {token}
   }
 }
 ```
+
+**アイテムオブジェクト:**
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| id | string | アイテムID |
+| gameId | string | ゲームID |
+| name | string | アイテム名 |
+| itemType | string | アイテム種別（FACILITY/MATERIAL/OTHER） |
+| hasRecipe | boolean | レシピが登録されているかどうか |
+| createdAt | string | 作成日時 |
 
 ---
 

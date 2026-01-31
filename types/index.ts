@@ -31,6 +31,7 @@ export interface Item {
   name: string;
   itemType: ItemType;
   createdAt: Date;
+  hasRecipe?: boolean; // 一覧取得時にレシピ有無を示すフラグ
 }
 
 export interface Recipe {
